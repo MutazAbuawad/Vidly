@@ -5,6 +5,13 @@ const app = express();
 // add json middleware of express to enable parsing the body of req
 app.use(express.json());
 
+// custom middleware function
+
+app.use(function(req, res, next){
+  // next is a reference to the next function in the req pipeline 
+  console.log('Logging ...')
+  next();
+})
 const courses = [
   { id: 1, name: "course1" },
   { id: 2, name: "course2" },

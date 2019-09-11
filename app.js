@@ -1,17 +1,25 @@
+require('dotenv').config({path: __dirname + '/.env'});
 const Joi = require("joi");
+const morgan = require('morgan');
+const logger = require('./logger');
 const express = require("express"); // returns a function
 const app = express();
 
+
 // add json middleware of express to enable parsing the body of req
-app.use(express.json());
-
+// populate req.body property 
+app.use(express.json());  // for parsing application/json
+// to enable key=value&key=value in req route and populate req.body
+app.use(express.urlencoded({ extended : true })); // for parsing application/x-www-form-urlencoded
+// to enable serving static files
+// http://localhost:3000/readme.txt
+app.use(express.static('public'));
 // custom middleware function
+app.use(logger);
+// HTTP request logger
+app.use(morgan('tiny'));
 
-app.use(function(req, res, next){
-  // next is a reference to the next function in the req pipeline 
-  console.log('Logging ...')
-  next();
-})
+
 const courses = [
   { id: 1, name: "course1" },
   { id: 2, name: "course2" },

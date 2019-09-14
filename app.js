@@ -1,131 +1,154 @@
-require('dotenv').config({path: __dirname + '/.env'});
-const Joi = require("joi");
+require('dotenv').config({ path: __dirname + '/.env' });
+const startupDebugger = require('debug')('app:startup');
+const dbDebugger = require('debug')('app:db');
+const conf = require('config');
 const morgan = require('morgan');
-const logger = require('./logger');
+const logger = require('./middlewares/logger');
 const express = require("express"); // returns a function
+const mongooese = require('mongoose');
+
+const courses = require('./routes/courses')
+const home = require('./routes/home');
+
+
 const app = express();
 
+app.set('view engine', 'pug');
+app.set('views', './views'); // default
 
 // add json middleware of express to enable parsing the body of req
 // populate req.body property 
 app.use(express.json());  // for parsing application/json
 // to enable key=value&key=value in req route and populate req.body
-app.use(express.urlencoded({ extended : true })); // for parsing application/x-www-form-urlencoded
+app.use(express.urlencoded({ extended: true })); // for parsing application/x-www-form-urlencoded
 // to enable serving static files
 // http://localhost:3000/readme.txt
 app.use(express.static('public'));
 // custom middleware function
 app.use(logger);
-// HTTP request logger
-app.use(morgan('tiny'));
-
-
-const courses = [
-  { id: 1, name: "course1" },
-  { id: 2, name: "course2" },
-  { id: 3, name: "course3" },
-  { id: 4, name: "course4" }
-];
-
-app.get("/", (req, res) => {
-  res.send("Hello World!");
-});
-
-app.get("/api/courses", (req, res) => {
-  res.send(courses);
-});
-
-// How to get api/route params from api endpoint -- for essential/ required values
-// api/courses/1
-app.get("/api/courses/:id", (req, res) => {
-  const course = courses.find(c => c.id === parseInt(req.params.id));
-
-  if (!course) {
-    return res.status(404).send(`The course with the given ID ${req.params.id} was not found`);
-  }
-
-  res.status(200).send(course);
-});
-
-app.get("/api/posts/:year/:month", (req, res) => {
-  res.send(req.params);
-});
-
-// How to get query strng params from endpoint -- for optional values
-// api/posts/:year?sortBy=name
-app.get("/api/posts/:year", (req, res) => {
-  res.send(req.query);
-});
-
-// to enable req.body to work we need to enable parsing of json object in body of req
-
-app.post("/api/courses", (req, res) => {
-  const { error } = validateCourse(req.body);
-
-  if (error) {
-    res.status(400).send(result.error.details[0].message);
-    return;
-  }
-
-  const course = {
-    id: courses.length + 1,
-    name: req.body.name
-  };
-  courses.push(course);
-
-  res.send(course);
-});
-
-app.put("/api/courses/:id", (req, res) => {
-  // Look up the course
-  // If not existing, return 404
-  const course = courses.find(c => c.id === parseInt(req.params.id));
-
-  if (!course) {
-   return res.status(404).send(`The course with the given ID ${req.params.id} was not found`);
-  }
-
-  // validate
-  // if invalid. return 400 - bad request
-  const { error } = validateCourse(req.body); // object destructure
-
-  if (error) {
-    res.status(400).send(result.error.details[0].message);
-    return;
-  }
-
-  // update course
-  course.name = req.body.name;
-  // return the updated course
-  res.send(course);
-});
-
-app.delete("/api/courses/:id", (req, res) => {
-  // Look up the course
-  // If not existing, return 404
-  const course = courses.find(c => c.id === parseInt(req.params.id));
-
-  if (!course) {
-    return  res.status(404).send(`The course with the given ID ${req.params.id} was not found`);
-  }
-
-  // delete course
-  const index = courses.indexOf(course);
-  courses.splice(index, 1);
-
-  // return the deleted course
-  res.send(course);
-});
-
-function validateCourse(course) {
-  const schema = {
-    name: Joi.string()
-      .min(3)
-      .required()
-  };
-
-  return Joi.validate(course, schema);
+if (app.get('env') === 'development') {
+  // HTTP request logger
+  app.use(morgan('tiny'));
+  startupDebugger('Morgane Enabled');
 }
+
+console.log(conf.get('name'));
+console.log(conf.get('mail.host'));
+console.log(conf.get('mail.password'));
+
+app.use('/api/courses', courses);
+app.use('/', home);
+
+mongooese.connect('mongodb://localhost/coursesDB', { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => dbDebugger('Connected to MongoDB'))
+  .catch((err) => console.error('Could not connected to MongoDB', err.message));
+
+const courseSchema = mongooese.Schema({
+  name: { type: String, required: true },
+  author: String,
+  tags: [String],
+  price: Number,
+  date: { type: String, default: Date.now },
+  isPublished: Boolean
+});
+
+// mongoose.model compiles the cousreSchema into Course class so can instantiate an objects/documents from that class
+const Course = mongooese.model('Course', courseSchema);
+
+// Create a course
+async function createCourse() {
+  const course = new Course({
+    name: 'Angular.js course',
+    author: 'Mosh',
+    tags: ['angular', 'frontend'],
+    price: 10,
+    isPublished: true
+  });
+
+  const result = await course.save();
+  console.log(result);
+}
+
+// Get courses
+async function getCourses() {
+  const courses = await Course
+    //.find({ author: 'Mosh', isPublished: true })
+    .find({ author: 'Mosh', price: { $gte: 10, $lte: 20 } }) // query courses with prices between 10 and 20
+    //.find({ author: 'Mosh', price : { $in : [10, 20, 30]}) // query courses with prices 10, 20 or 30
+    //.find()
+    //.or([{ author: 'Mosh' }, { isPublished: true }])
+    //.and([{ author: 'Mosh' }, { isPublished: true }])
+    .limit(10)
+    .sort({ name: 1 })
+    .select({ name: 1, tags: 1 });
+  console.log(courses);
+}
+
+// Get count of courses
+async function getCountOfCourses() {
+  const coursesCount = await Course
+    //.find({ author: 'Mosh', isPublished: true })
+    .find()
+    .countDocuments();
+  console.log(coursesCount);
+}
+
+// pagination
+// /api/courses?pageNumber=2&pageSize=10 
+async function getCoursesInPage(pageNumber, pageSize) {
+  const courses = await Course
+    .find()
+    .skip((pageNumber - 1) * pageSize)
+    .limit(pageSize);
+  console.log(courses);
+}
+
+async function updateCourseFirstApproach(id) {
+  // first approach: Query first
+  // findById()
+  // Modify its properties
+  // save()
+  const course = await Course.findById(id);
+  if (!course) return;
+
+  course.isPublished = false;
+  course.author = 'Mutaz';
+  // or
+  // course.set({
+  //   isPublished: false,
+  //   author:'Mutaz'
+  // });
+
+  const res = await course.save();
+  console.log(res);
+}
+
+async function updayeCourseSecondApproach(id) {
+  // second approach: update first
+  // update directly
+  // optionally: get the updated documnet
+  const course = await Course.findByIdAndUpdate(id, {
+    $set: {
+      author: 'Jason',
+      isPublished: true
+    }
+  }, { new: true });
+
+  console.log(course);
+}
+
+async function deleteCourse(id) {
+  const course = await Course.findByIdAndDelete(id);
+  console.log(course);
+}
+
+// createCourse();
+// getCourses();
+// getCountOfCourses();
+// getCoursesInPage(1, 2);
+// updateCourseFirstApproach('5d7be96c6d3123296407cfdc');
+// updayeCourseSecondApproach('5d7be96c6d3123296407cfdc')
+deleteCourse('5d7bef90e9a1bf15385eacd7');
 
 // add a port so server can listening on
 const port = process.env.PORT || 3000;

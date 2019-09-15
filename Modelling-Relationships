@@ -1,0 +1,36 @@
+// Trade off between query performance and consistency
+1st Approach : Using References (Normalaization) => consistency
+ex: 
+
+let author = {
+    name: 'Mosh'
+}
+
+let course = {
+    author: ObjectId('.....')
+}
+
+2nd Approach : Embeded Documents (Denormalization) => Performance 
+ex: 
+
+let course = {
+    author : {
+        name : 'Mosh',
+        .....
+    }
+}
+
+3rd Approach: Hybrid => Useful when want to take snapshot data
+ex: 
+
+let author = {
+    name: 'Mosh',
+    // 50 other properties
+}
+
+let course = {
+    author : {
+        id: 'ref',
+        name : 'Mosh'
+    }
+}

@@ -55,23 +55,31 @@ mongooese
 //   isPublished: Boolean
 // });
 
+// Reference Approach
+// const courseSchema = mongooese.Schema({
+//   name : String,
+//   author: {
+//     type: mongooese.Schema.Types.ObjectId,
+//     ref: 'Author'
+//   }
+// });
+
+const authorSchema = mongooese.Schema({
+  name: String,
+  bio: String,
+  website: String
+});
+
+// Embeded Approach
 const courseSchema = mongooese.Schema({
-  name : String,
-  author: {
-    type: mongooese.Schema.Types.ObjectId,
-    ref: 'Author'
-  }
+  name: String,
+  author: authorSchema
 });
 
 // mongoose.model compiles the cousreSchema into Course class so can instantiate an objects/documents from that class
 const Course = mongooese.model('Course', courseSchema);
 
-const Author = mongooese.model('Author',mongooese.Schema({
-    name: String,
-    bio: String,
-    website: String
-  })
-);
+const Author = mongooese.model('Author', authorSchema);
 
 // Create a course
 async function createCourse() {
@@ -121,7 +129,7 @@ async function getCourses() {
     //.and([{ author: 'Mosh' }, { isPublished: true }])
     // .limit(10)
     // .sort({ name: 1 })
-    .select({ name: 1});
+    .select({ name: 1 });
   console.log(courses);
 }
 
@@ -175,7 +183,7 @@ async function updayeCourseSecondApproach(id) {
         isPublished: true
       }
     },
-    { new: true }
+    { new: true } // to return the updated document
   );
 
   console.log(course);
@@ -186,6 +194,38 @@ async function deleteCourse(id) {
   console.log(course);
 }
 
+// listCourses with populate
+async function listCourses() {
+  const courses = await Course
+    .find()
+    .populate('author', 'name bio')
+    .select('name author');
+
+  console.log(courses);
+}
+
+async function updateAuthor(courseId) {
+  const course = await Course.findById(courseId);
+  course.author.name = 'Mike';
+  const res = course.save();
+  res.then(c => console.log(c));
+
+  // or using update with $set
+
+  // const course = Course.update({_id: courseId}, {
+  //   $set: {
+  //     'author.name': 'John Smith'
+  //   }
+  // });
+
+  // or using upate with $unset to remove author propert
+  
+  // const course = Course.update({_id: courseId}, {
+  //   $unset: {
+  //     'author': ''
+  //   }
+  // });
+}
 // createCourse();
 // getCourses();
 // getCountOfCourses();
@@ -193,9 +233,16 @@ async function deleteCourse(id) {
 // updateCourseFirstApproach('5d7be96c6d3123296407cfdc');
 // updayeCourseSecondApproach('5d7be96c6d3123296407cfdc')
 // deleteCourse('5d7bef90e9a1bf15385eacd7');
-createAuthor('Mosh','My bio','My website');
-// createCourse('Node Course', 'authorId');
-// getCourses();
+
+
+// createAuthor('Mosh','My bio','My website');
+// createCourse('Node Course', '5d7e7f1e3d9dad4044692fd3');
+// listCourses();
+
+// createCourse('Node JS', new Author({ name: 'Mutaz' }));
+updateAuthor('5d7e83ec07f63938744e9b7b');
+
+
 
 // add a port so server can listening on
 const port = process.env.PORT || 3000;

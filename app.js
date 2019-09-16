@@ -39,10 +39,10 @@ app.use('/api/courses', courses);
 app.use('/', home);
 
 mongooese
-  .connect('mongodb://localhost/coursesDB', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-  })
+    .connect('mongodb://localhost/coursesDB', {
+      useNewUrlParser: true,
+      useUnifiedTopology: true
+    })
   .then(() => dbDebugger('Connected to MongoDB'))
   .catch(err => console.error('Could not connected to MongoDB', err.message));
 
@@ -219,7 +219,7 @@ async function updateAuthor(courseId) {
   // });
 
   // or using upate with $unset to remove author propert
-  
+
   // const course = Course.update({_id: courseId}, {
   //   $unset: {
   //     'author': ''
